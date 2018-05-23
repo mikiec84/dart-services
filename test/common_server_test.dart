@@ -104,7 +104,11 @@ void defineTests() {
       expect(response.status, 200);
       expect(
           response.headers['content-type'], 'application/json; charset=utf-8');
-      var data = await response.body.first;
+      var dataList = (await response.body.toList());
+      print (dataList);
+      print (dataList.length);
+      var data = dataList.first;
+      print (data);
       var expectedJson = {
         'issues': [
           {
@@ -119,6 +123,7 @@ void defineTests() {
         ],
         'packageImports': []
       };
+      print (JSON.decode(UTF8.decode(data)));
       expect(JSON.decode(UTF8.decode(data)), expectedJson);
     });
 
