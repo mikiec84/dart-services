@@ -108,7 +108,7 @@ void defineTests() {
       //print (dataList);
       //print (dataList.length);
       var data = await response.body.first;
-      print (data);
+      //print (data);
       var expectedJson = {
         'issues': [
           {
@@ -123,7 +123,7 @@ void defineTests() {
         ],
         'packageImports': []
       };
-      print (JSON.decode(UTF8.decode(data)));
+      //print (JSON.decode(UTF8.decode(data)));
       expect(JSON.decode(UTF8.decode(data)), expectedJson);
     });
 
