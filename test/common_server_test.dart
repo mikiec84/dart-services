@@ -104,10 +104,10 @@ void defineTests() {
       expect(response.status, 200);
       expect(
           response.headers['content-type'], 'application/json; charset=utf-8');
-      var dataList = (await response.body.toList());
-      print (dataList);
-      print (dataList.length);
-      var data = dataList.first;
+      //var dataList = (await response.body.toList());
+      //print (dataList);
+      //print (dataList.length);
+      var data = await response.body.first;
       print (data);
       var expectedJson = {
         'issues': [
