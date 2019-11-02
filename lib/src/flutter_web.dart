@@ -88,9 +88,10 @@ $_samplePackageName:lib/
   }
 
   static final Set<String> _flutterWebImportPrefixes = <String>{
-    'package:flutter_web',
-    'package:flutter_web_ui',
-    'package:flutter_web_test',
+    // TODO(redbrogdon): Add any other valid packages.
+    'package:flutter/material',
+    'package:flutter/widgets',
+    'package:flutter/foundation',
   };
 
   bool usesFlutterWeb(Set<String> imports) {

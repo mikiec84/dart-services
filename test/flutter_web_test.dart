@@ -33,15 +33,13 @@ void defineTests() {
     test('usesFlutterWeb', () {
       expect(flutterWebManager.usesFlutterWeb({''}), isFalse);
       expect(flutterWebManager.usesFlutterWeb({'dart:html'}), isFalse);
-      expect(flutterWebManager.usesFlutterWeb({'package:flutter_web'}), isTrue);
-      expect(
-          flutterWebManager.usesFlutterWeb({'package:flutter_web/'}), isTrue);
+      expect(flutterWebManager.usesFlutterWeb({'package:flutter/material.dart'}), isTrue);
     });
 
     test('getUnsupportedImport', () {
       expect(flutterWebManager.getUnsupportedImport({'dart:html'}), isNull);
       expect(flutterWebManager.getUnsupportedImport({'package:flutter_web/'}),
-          isNull);
+          equals('package:flutter_web/'));
       expect(flutterWebManager.getUnsupportedImport({'package:path'}),
           equals('package:path'));
       expect(flutterWebManager.getUnsupportedImport({'foo.dart'}),

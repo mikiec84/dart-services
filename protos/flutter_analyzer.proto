@@ -1,0 +1,134 @@
+syntax = "proto3";
+
+package flutter_analyzer;
+
+message AnalyzerRequest {
+    oneof test_oneof {
+        AnalyzeRequest analyze = 1;
+        AssistsRequest assists = 2;
+        CompleteRequest complete = 3;
+        FixesMultiRequest fixesMulti = 4;
+        FormatRequest format = 5;
+    }
+}
+
+message AnalyzerReply {
+    oneof test_oneof {
+        AnalyzeReply analyze = 1;
+        AssistsReply assists = 2;
+        CompleteReply complete = 3;
+        FixesMultiReply fixesMulti = 4;
+        FormatReply format = 5;
+        Errors errors = 99;
+    }
+}
+
+message Errors {
+    repeated string errors = 99;
+}
+
+// The request message containing the Flutter source code.
+message AnalyzeRequest { string source = 1; }
+
+message AnalyzeReply {
+    repeated AnalysisIssue issues = 1;
+    repeated string packageImports = 2;
+}
+
+message AnalysisIssue {
+    string kind = 1;
+    int32 line = 2;
+    string message = 3;
+    string sourceName = 4;
+    bool hasFixes = 5;
+    int32 charStart = 6;
+    int32 charLength = 7;
+}
+
+message CompleteRequest {
+    string src = 1;
+    int32 offset = 2;
+}
+
+message CompleteReply {
+    // The offset of the start of the text to be replaced.
+    int32 replacementOffset = 1;
+
+    // The length of the text to be replaced.
+    int32 replacementLength = 2;
+
+    repeated CompleteCompletion completions = 3;
+}
+
+message CompleteCompletion { map<string, string> completion = 1; }
+
+message FixesMultiRequest {
+    map<string, string> sources = 1;
+    Location location = 2;
+}
+
+message FixesMultiReply { repeated ProblemAndFixes fixes = 1; }
+
+message Location {
+    string sourceName = 1;
+    int32 offset = 2;
+}
+
+message ProblemAndFixes {
+    repeated CandidateFix fixes = 1;
+    string problemMessage = 2;
+    int32 offset = 3;
+    int32 length = 4;
+}
+
+message CandidateFix {
+    string message = 1;
+    repeated SourceEdit edits = 2;
+    int32 selectionOffset = 3;
+    repeated LinkedEditGroup linkedEditGroups = 4;
+}
+
+message SourceEdit {
+    int32 offset = 1;
+    int32 length = 2;
+    string replacement = 3;
+}
+
+message LinkedEditGroup {
+    // The positions of the regions that should be edited simultaneously.
+    repeated int32 positions = 1;
+
+    // The length of the regions that should be edited simultaneously.
+    int32 length = 2;
+
+    // Pre-computed suggestions for what every region might want to be changed to.
+    repeated LinkedEditSuggestion suggestions = 3;
+}
+
+message LinkedEditSuggestion {
+    // The value that could be used to replace all of the linked edit regions.
+    string value = 1;
+
+    // The kind of value being proposed.
+    string kind = 2;
+}
+
+message FormatRequest {
+    string src = 1;
+    int32 offset = 2;
+}
+
+message FormatReply {
+    // The formatted source code.
+    string newString = 1;
+
+    // The (optional) new offset of the cursor; can be `null`.
+    int32 offset = 2;
+}
+
+message AssistsRequest {
+    string src = 1;
+    int32 offset = 2;
+}
+
+message AssistsReply { repeated CandidateFix assists = 1; }

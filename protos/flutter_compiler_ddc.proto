@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package flutter_compiler_ddc;
+
+// The request message containing the Flutter source code.
+message CompileDDCRequest {
+    string source = 1;
+}
+
+message CompileDDCReply {
+    oneof test_oneof {
+        CompileDDCSuccessReply success = 1;
+        CompileDDCFailureReply failure = 2;
+    }
+}
+
+// The response message containing the compiled JS, and URL of the modules base.
+message CompileDDCSuccessReply {
+    string result = 1;
+    string modulesBaseUrl = 2;
+}
+
+message CompileDDCFailureReply {
+    repeated string reasons = 1;
+}

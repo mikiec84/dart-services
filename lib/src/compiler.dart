@@ -11,11 +11,13 @@ import 'dart:io';
 import 'package:bazel_worker/driver.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
+import 'package:http/http.dart' as http;
+
+import 'generated/flutter_compiler_ddc.pb.dart' as proto;
 
 import 'common.dart';
 import 'flutter_web.dart';
 import 'pub.dart';
-import 'sdk_manager.dart';
 
 Logger _logger = Logger('compiler');
 
@@ -26,14 +28,14 @@ class Compiler {
   final FlutterWebManager flutterWebManager;
 
   final BazelWorkerDriver _ddcDriver;
-  String _sdkVersion;
+  //String _sdkVersion;
 
   Compiler(this.sdkPath, this.flutterWebManager)
       : _ddcDriver = BazelWorkerDriver(
             () => Process.start(path.join(sdkPath, 'bin', 'dartdevc'),
                 <String>['--persistent_worker']),
             maxWorkers: 1) {
-    _sdkVersion = SdkManager.sdk.version;
+    //_sdkVersion = SdkManager.sdk.version;
   }
 
   bool importsOkForCompile(Set<String> imports) {
@@ -126,52 +128,74 @@ class Compiler {
       ]);
     }
 
-    Directory temp = await Directory.systemTemp.createTemp('dartpad');
-
     try {
-      List<String> arguments = <String>[
-        '--modules=amd',
-      ];
+      final apiUrl = 'https://flutter-compiler-ddc.api.dartpad.dev/';
+      final requestData = proto.CompileDDCRequest()..source = input;
+      final response =
+          await http.post(apiUrl, body: requestData.writeToBuffer());
 
-      if (flutterWebManager.usesFlutterWeb(imports)) {
-        arguments.addAll(<String>['-s', flutterWebManager.summaryFilePath]);
+      if (response.statusCode != 200) {
+        throw 'Unsuccessful request: ${response.body}';
       }
 
-      String compileTarget = path.join(temp.path, kMainDart);
-      File mainDart = File(compileTarget);
-      await mainDart.writeAsString(input);
+      final bytes = response.bodyBytes;
+      final responseData = proto.CompileDDCReply.fromBuffer(bytes);
 
-      arguments.addAll(<String>['-o', path.join(temp.path, '$kMainDart.js')]);
-      arguments.add('--single-out-file');
-      arguments.addAll(<String>['--module-name', 'dartpad_main']);
-      arguments.add(compileTarget);
-      arguments.addAll(<String>['--library-root', temp.path]);
-
-      File mainJs = File(path.join(temp.path, '$kMainDart.js'));
-
-      _logger.info('About to exec dartdevc with:  $arguments');
-
-      final WorkResponse response =
-          await _ddcDriver.doWork(WorkRequest()..arguments.addAll(arguments));
-
-      if (response.exitCode != 0) {
-        return DDCCompilationResults.failed(<CompilationProblem>[
-          CompilationProblem._(response.output),
-        ]);
-      } else {
-        final DDCCompilationResults results = DDCCompilationResults(
-          compiledJS: await mainJs.readAsString(),
-          modulesBaseUrl: 'https://storage.googleapis.com/'
-              'compilation_artifacts/$_sdkVersion/',
-        );
-        return results;
+      if (responseData.failure != null &&
+          responseData.failure.reasons.isNotEmpty) {
+        throw responseData.failure.reasons;
       }
+
+      final results = DDCCompilationResults(
+        compiledJS: responseData.success.result,
+        modulesBaseUrl: responseData.success.modulesBaseUrl,
+      );
+
+      return results;
+
+//    Directory temp = await Directory.systemTemp.createTemp('dartpad');
+//
+//    try {
+//      List<String> arguments = <String>[
+//        '--modules=amd',
+//      ];
+//
+//      if (flutterWebManager.usesFlutterWeb(imports)) {
+//        arguments.addAll(<String>['-s', flutterWebManager.summaryFilePath]);
+//      }
+//
+//      String compileTarget = path.join(temp.path, kMainDart);
+//      File mainDart = File(compileTarget);
+//      await mainDart.writeAsString(input);
+//
+//      arguments.addAll(<String>['-o', path.join(temp.path, '$kMainDart.js')]);
+//      arguments.add('--single-out-file');
+//      arguments.addAll(<String>['--module-name', 'dartpad_main']);
+//      arguments.add(compileTarget);
+//      arguments.addAll(<String>['--library-root', temp.path]);
+//
+//      File mainJs = File(path.join(temp.path, '$kMainDart.js'));
+//
+//      _logger.info('About to exec dartdevc with:  $arguments');
+//
+//      final WorkResponse response =
+//          await _ddcDriver.doWork(WorkRequest()..arguments.addAll(arguments));
+//
+//      if (response.exitCode != 0) {
+//        return DDCCompilationResults.failed(<CompilationProblem>[
+//          CompilationProblem._(response.output),
+//        ]);
+//      } else {
+//        final DDCCompilationResults results = DDCCompilationResults(
+//          compiledJS: await mainJs.readAsString(),
+//          modulesBaseUrl: 'https://storage.googleapis.com/'
+//              'compilation_artifacts/$_sdkVersion/',
+//        );
+//        return results;
+//      }
     } catch (e, st) {
       _logger.warning('Compiler failed: $e\n$st');
       rethrow;
-    } finally {
-      await temp.delete(recursive: true);
-      _logger.info('temp folder removed: ${temp.path}');
     }
   }
 
@@ -218,6 +242,7 @@ class DDCCompilationResults {
 
   /// This is true if there were no errors.
   bool get success => problems.isEmpty;
+
   @override
   String toString() => success
       ? 'CompilationResults: Success'

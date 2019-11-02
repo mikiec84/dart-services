@@ -8,3 +8,4 @@ analyzer:
     - 'third_party/**'
     - 'doc/generated/**'
     - 'flutter_web/**'
+    - 'lib/src/generated/**'

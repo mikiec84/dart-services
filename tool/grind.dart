@@ -13,6 +13,9 @@ import 'package:grinder/grinder.dart';
 import 'package:grinder/grinder_files.dart';
 import 'package:http/http.dart' as http;
 
+const protosDestDir = 'lib/src/generated';
+const protosSrcDir = 'protos';
+
 Future<void> main(List<String> args) async {
   await SdkManager.sdk.init();
   return grind(args);
@@ -218,4 +221,18 @@ void discovery() {
     '--input-dir=doc/generated',
     '--output-dir=doc/generated'
   ]);
+}
+
+@Task()
+Future<void> genProtos() async {
+  for (final file in ['flutter_compiler_ddc.proto', 'flutter_analyzer.proto']) {
+    run(
+      'protoc',
+      arguments: [
+        '-I=$protosSrcDir',
+        '--dart_out=$protosDestDir',
+        '$protosSrcDir/$file',
+      ],
+    );
+  }
 }

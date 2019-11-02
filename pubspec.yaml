@@ -22,6 +22,7 @@ dependencies:
   uuid: ^2.0.0
   yaml: ^2.1.15
   quiver: ^2.0.3
+  protobuf: ^1.0.0
 
 dev_dependencies:
   discoveryapis_generator: ^0.9.11

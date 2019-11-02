@@ -11,6 +11,7 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:dartis/dartis.dart' as redis;
+import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:quiver/cache.dart';
@@ -22,6 +23,7 @@ import 'api_classes.dart';
 import 'common.dart';
 import 'compiler.dart';
 import 'flutter_web.dart';
+import 'generated/flutter_analyzer.pb.dart' as proto;
 import 'pub.dart';
 import 'sdk_manager.dart';
 
@@ -420,7 +422,51 @@ class CommonServer {
     try {
       final Stopwatch watch = Stopwatch()..start();
 
-      AnalysisResults results = await analysisServer.analyze(source);
+      final imports = getAllImportsFor(source);
+
+      AnalysisResults results;
+
+      if (imports.any((i) => i.startsWith('package:flutter/'))) {
+        // Source is using Flutter. Should analyze via the Cloud Run endpoint.
+        final apiUrl = 'https://flutter-analyzer.api.dartpad.dev/';
+        final requestData = proto.AnalyzerRequest()
+          ..analyze = (proto.AnalyzeRequest()..source = source);
+        final response =
+            await http.post(apiUrl, body: requestData.writeToBuffer());
+
+        if (response.statusCode != 200) {
+          throw 'Unsuccessful analyze request: ${response.body}';
+        }
+
+        final bytes = response.bodyBytes;
+        final responseData = proto.AnalyzerReply.fromBuffer(bytes);
+
+        if (responseData.errors != null &&
+            responseData.errors.errors.isNotEmpty) {
+          throw responseData.errors.errors;
+        }
+
+        final issues = <AnalysisIssue>[];
+
+        for (final issue in responseData.analyze.issues) {
+          issues.add(AnalysisIssue.fromIssue(
+            issue.kind,
+            issue.line,
+            issue.message,
+            charStart: issue.charStart,
+            charLength: issue.charLength,
+            sourceName: issue.sourceName,
+            hasFixes: issue.hasFixes,
+          ));
+        }
+
+        final results =
+            AnalysisResults(issues, responseData.analyze.packageImports);
+        return results;
+      } else {
+        results = await analysisServer.analyze(source);
+      }
+
       int lineCount = source.split('\n').length;
       int ms = watch.elapsedMilliseconds;
       log.info('PERF: Analyzed $lineCount lines of Dart in ${ms}ms.');
@@ -630,13 +676,45 @@ class CommonServer {
     if (source == null) {
       throw BadRequestError('Missing parameter: \'source\'');
     }
+
     offset ??= 0;
 
     Stopwatch watch = Stopwatch()..start();
 
-    FormatResponse response = await analysisServer.format(source, offset);
+    final imports = getAllImportsFor(source);
+    FormatResponse results;
+
+    if (imports.any((i) => i.startsWith('package:flutter/'))) {
+      // Source is using Flutter. Should analyze via the Cloud Run endpoint.
+      final apiUrl = 'https://flutter-analyzer.api.dartpad.dev/';
+      final requestData = proto.AnalyzerRequest()
+        ..format = (proto.FormatRequest()
+          ..src = source
+          ..offset = offset);
+
+      final response =
+          await http.post(apiUrl, body: requestData.writeToBuffer());
+
+      if (response.statusCode != 200) {
+        throw 'Unsuccessful format request: ${response.body}';
+      }
+
+      final bytes = response.bodyBytes;
+      final responseData = proto.AnalyzerReply.fromBuffer(bytes);
+
+      if (responseData.errors != null &&
+          responseData.errors.errors.isNotEmpty) {
+        throw responseData.errors.errors;
+      }
+
+      results = FormatResponse(
+          responseData.format.newString, responseData.format.offset);
+    } else {
+      results = await analysisServer.format(source, offset);
+    }
+
     log.info('PERF: Computed format in ${watch.elapsedMilliseconds}ms.');
-    return response;
+    return results;
   }
 
   Future<String> checkCache(String query) => cache.get(query);
